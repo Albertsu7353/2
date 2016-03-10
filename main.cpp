@@ -10,6 +10,7 @@
 #include <SDL_image.h>
 #include "Matrix.h"
 #include "ShaderProgram.h"
+#include <SDL_mixer.h>
 
 #ifdef _WINDOWS
 #define RESOURCE_FOLDER ""
@@ -18,6 +19,7 @@
 #endif
 
 SDL_Window* displayWindow;
+
 
 GLuint LoadTexture(const char *image_path)
 {
@@ -52,6 +54,16 @@ int main(int argc, char *argv[])
 	projectionMatrix.setOrthoProjection(-3.55f, 3.55f, -2.0f, 2.0f, -1.0f, 1.0f);
 	glUseProgram(program.programID);
 
+	float lastFrameTicks = 0.0f;
+
+	Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 4096);
+
+	Mix_Chunk *someSound;
+	someSound = Mix_LoadWAV("effect.wav");
+
+	Mix_Music *music;
+	music = Mix_LoadMUS("music.wav");
+
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//right paddle
@@ -68,6 +80,7 @@ int main(int argc, char *argv[])
 	//starting position, ball and paddles set in middle
 	bool reset = 1;
 
+	Mix_PlayMusic(music, -1);
 	SDL_Event event;
 	bool done = false;
 	while (!done)
@@ -79,26 +92,37 @@ int main(int argc, char *argv[])
 			}
 		}
 
-		if (ballDir == 1)
-			ballX += 0.002f;
-		else
-			ballX += -0.002f;
 
-		if (ballY >= 1.95f || ballY<-1.95f)
-			ballYSpeed = -ballYSpeed;
+
+		float ticks = (float)SDL_GetTicks() / 1000.0f;
+		float elapsed = ticks - lastFrameTicks;
+		lastFrameTicks = ticks;
+
+		if (ballDir == 1)
+			ballX += elapsed*2.0f;
+		else
+			ballX += -elapsed*2.0f;
+
+		if (ballY >= 1.95f || ballY < -1.95f)
+		{
+		Mix_PlayChannel(-1, someSound, 0);
+		ballYSpeed = -ballYSpeed;
+		}
 
 		ballY += ballYSpeed;
 		//checks collision with right paddle
 		if (ballX > 3.35 && rightY > ballY - 0.45f && rightY < ballY + 0.45f)
 		{
+			Mix_PlayChannel(-1, someSound, 0);
 			ballDir = 0;
-			ballYSpeed = ballYSpeed + (ballY - rightY)*0.002f;
+			ballYSpeed += (ballY - rightY)*elapsed;
 		}
 		//checks collision with left paddle
 		if (ballX <-3.35 && leftY >ballY - 0.45f && leftY < ballY + 0.45f)
 		{
+			Mix_PlayChannel(-1, someSound, 0);
 			ballDir = 1;
-			ballYSpeed = ballYSpeed + (ballY - leftY)*0.002f;
+			ballYSpeed += (ballY - leftY)*elapsed;
 		}
 
 		if (ballX > 3.5 || ballX < -3.5)
@@ -106,24 +130,24 @@ int main(int argc, char *argv[])
 
 		const Uint8 *keys = SDL_GetKeyboardState(NULL);
 		if (keys[SDL_SCANCODE_DOWN])
-		{	
+		{
 			if (rightY>-1.6)
-				rightY += -0.0025f;
+				rightY += -elapsed*2.0f;
 		}
 		if (keys[SDL_SCANCODE_UP])
 		{
 			if (rightY<1.6)
-				rightY += 0.0025f;
+				rightY += elapsed*2.0f;
 		}
 		if (keys[SDL_SCANCODE_S])
 		{
 			if (leftY>-1.6)
-				leftY += -0.0025f;
+				leftY += -elapsed*2.0f;
 		}
 		if (keys[SDL_SCANCODE_W])
 		{
 			if (leftY<1.6)
-				leftY += 0.0025f;
+				leftY += elapsed*2.0f;
 		}
 		program.setModelMatrix(modelMatrix);
 		program.setProjectionMatrix(projectionMatrix);
@@ -137,7 +161,7 @@ int main(int argc, char *argv[])
 		glEnableVertexAttribArray(program.texCoordAttribute);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glDisableVertexAttribArray(program.positionAttribute);
-		glDisableVertexAttribArray(program.texCoordAttribute);	
+		glDisableVertexAttribArray(program.texCoordAttribute);
 
 		glBindTexture(GL_TEXTURE_2D, paddle);
 		float vertices2[] = { -4.0f, -0.4f + leftY, -3.4f, -0.4f + leftY, -3.4f, 0.4f + leftY, -4.0f, -0.4f + leftY, -3.4f, 0.4f + leftY, -4.0f, 0.4f + leftY };
@@ -153,7 +177,7 @@ int main(int argc, char *argv[])
 		if (reset)
 		{
 			ballX = 0.0;
-			ballY = 0.0; 
+			ballY = 0.0;
 			rightY = 0.0;
 			leftY = 0.0;
 			ballYSpeed = 0.0;
